@@ -29,7 +29,7 @@ export default function App() {
 
       {/* Chat */}
       <div className="chat-panel">
-        <Chat setFiles={setFiles} />
+        <Chat files={files} setFiles={setFiles} />
       </div>
 
       {/* Editor + Tabs */}
