@@ -8,10 +8,13 @@ export default function Preview({ files }) {
     <html>
       <head>
         <style>
-          body { 
-            margin: 0; 
+          body {
+            margin: 0;
+            padding: 0;
             font-family: system-ui, sans-serif;
+            box-sizing: border-box;
           }
+
           ${css}
         </style>
       </head>
@@ -19,37 +22,34 @@ export default function Preview({ files }) {
         ${html}
 
         <script>
-          try {
-            ${js}
-          } catch (e) {
-            console.error(e);
-          }
+          document.addEventListener("DOMContentLoaded", () => {
+            try {
+              ${js}
+            } catch (e) {
+              console.error("JS Error:", e);
+            }
+          });
         </script>
       </body>
     </html>
   `;
 
   return (
-    <div style={{ flex: 1, padding: '16px', background: 'var(--bg-main)'}}>
+    <div style={{ flex: 1, padding: '16px', background: 'var(--bg-main)' }}>
       <div style={{ 
         width: "100%", 
         height: "100%", 
-        borderRadius: "8px", 
+        borderRadius: "10px", 
         overflow: "hidden",
-        border: "1px solid var(--border-light)",
-        boxShadow: "0 4px 20px rgba(0,0,0,0.2)",
-        background: "white" 
+        border: "1px solid rgba(255,255,255,0.08)",
+        boxShadow: "0 8px 30px rgba(0,0,0,0.4)",
+        background: "white"
       }}>
         <iframe
           srcDoc={srcDoc}
-          title="preview"
-          sandbox="allow-scripts"
-          style={{
-            width: "100%",
-            height: "100%",
-            border: "none",
-            background: "white"
-          }}
+          sandbox="allow-scripts allow-forms allow-modals"
+          referrerPolicy="no-referrer"
+          style={{ width: "100%", height: "100%", border: "none" }}
         />
       </div>
     </div>
