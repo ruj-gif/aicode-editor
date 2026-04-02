@@ -9,8 +9,12 @@ router.post("/", async (req, res) => {
   console.log("🔥 Prompt:", prompt);
 
   try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 20000);
+
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
+      signal: controller.signal,
       headers: {
         "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
         "Content-Type": "application/json",
@@ -18,22 +22,30 @@ router.post("/", async (req, res) => {
         "X-Title": "AI Code Editor"
       },
       body: JSON.stringify({
-        model: "meta-llama/llama-3-8b-instruct",
+        model: "openai/gpt-3.5-turbo",
         messages: [
           {
             role: "system",
             content: `
 You are an expert frontend developer.
 
+Return ONLY valid JSON with EXACT keys:
+- "index.html"
+- "style.css"
+- "script.js"
+
 STRICT RULES:
-- Return ONLY valid HTML
-- Use inline CSS ONLY
-- Do NOT explain anything
-- Do NOT include markdown
-- Output should start directly with HTML
+- NO explanation
+- NO markdown
+- NO extra text
+- Escape quotes properly using \\\\"
 
 Example:
-<div style="...">...</div>
+{
+  "index.html": "<div class=\\"box\\">Hello</div>",
+  "style.css": "body { background: red; }",
+  "script.js": "console.log('hi');"
+}
 `
           },
           {
@@ -44,29 +56,69 @@ Example:
       }),
     });
 
+    clearTimeout(timeout);
+
     const data = await response.json();
 
     console.log("RAW RESPONSE:", data);
 
-    let output =
-      data?.choices?.[0]?.message?.content || "<h1>No response</h1>";
+    let output = data?.choices?.[0]?.message?.content || "";
 
-    // 🔥 Clean output
-    output = output.replace(/```html/g, "").replace(/```/g, "");
+    // 🔥 Clean markdown
+    output = output.replace(/```json/g, "").replace(/```/g, "").trim();
 
-    if (output.includes("<")) {
-      output = output.substring(output.indexOf("<"));
+    // 🔥 Extract JSON
+    const jsonMatch = output.match(/\{[\s\S]*\}/);
+
+    let files;
+
+    if (jsonMatch) {
+      let jsonString = jsonMatch[0];
+
+      // 🔥 Clean JSON safely
+      jsonString = jsonString
+        .replace(/\n/g, " ")
+        .replace(/\r/g, "")
+        .replace(/\t/g, "")
+        .replace(/,\s*}/g, "}")
+        .replace(/,\s*]/g, "]");
+
+      try {
+        files = JSON.parse(jsonString);
+      } catch (e) {
+        console.error("❌ JSON parse error:", e);
+      }
     }
 
-    console.log("✅ AI Response:", output);
+    // 🔥 Validate structure
+    if (
+      !files ||
+      !files["index.html"] ||
+      !files["style.css"] ||
+      !files["script.js"]
+    ) {
+      console.warn("⚠️ Invalid AI response structure");
 
-    res.json({ code: output });
+      files = {
+        "index.html": "<h1>Fallback UI</h1>",
+        "style.css": "body { font-family: Arial; text-align: center; }",
+        "script.js": "console.log('Fallback');"
+      };
+    }
+
+    console.log("✅ FINAL FILES:", files);
+
+    res.json({ files });
 
   } catch (err) {
     console.error("❌ FULL ERROR:", err);
 
     res.json({
-      code: "<h1>AI failed ⚠️</h1><p>Try again</p>"
+      files: {
+        "index.html": "<h1>AI failed ⚠️</h1>",
+        "style.css": "",
+        "script.js": ""
+      }
     });
   }
 });
